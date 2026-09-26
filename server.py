@@ -17,7 +17,8 @@ msg = Client_S.recv(1024).decode()
 
 print("Received from client: ", msg)
 
-Client_S.send("CC".encode())
+if msg == "(SS,RFMP,v1.0,0)":
+    Client_S.send("(CC)".encode())
 
 Client_S.close()
 Server_S.close()

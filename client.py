@@ -6,7 +6,7 @@ Port = 5000
 Client_S = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 Client_S.connect((Host,Port))
 
-msg = "SS,REMP,v1.0,0"
+msg = "(SS,RFMP,v1.0,0)"
 
 Client_S.send(msg.encode())
 
