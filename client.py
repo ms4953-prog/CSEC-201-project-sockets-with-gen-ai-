@@ -53,12 +53,14 @@ client_public_key_bytes = client_public_key.public_bytes(
 	format=serialization.PublicFormat.SubjectPublicKeyInfo
 )
 
+encrypted_session_key_text = encrypted_session_key.hex()
+
 ec_packet = (
-	b"(EC,AES"
-	+ encrypted_session_key
-	+ b","
-	+ client_public_key_bytes
-	+ b")"
+    b"(EC,AES,"
+    + encrypted_session_key_text.encode()
+    + b","
+    + client_public_key_bytes
+    + b")"
 )
 
 print("Ec packet created.")
