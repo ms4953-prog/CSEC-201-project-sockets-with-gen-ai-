@@ -1,5 +1,6 @@
 import socket
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 Host = "127.0.0.1"
 Port = 5000
 
@@ -20,6 +21,11 @@ private_key = rsa.generate_private_key(
 
 public_key = private_key.public_key()
 
+public_key_bytes = public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+)
+
 msg = Client_S.recv(1024).decode()
 
 print("Received from client: ", msg)
@@ -28,7 +34,9 @@ if msg == "(SS,RFMP,v1.0,0)":
     Client_S.send("(CC)".encode())
 
 elif msg == "(SS,RFMP,v1.0,1)":
-    Client_S.send("(cc,pubkey)".encode())
+    response = b"(CC," + public_key_bytes + b")"
+
+    Client_S.send(response)
 
 Client_S.close()
 Server_S.close()

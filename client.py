@@ -10,7 +10,7 @@ msg = "(SS,RFMP,v1.0,1)"
 
 Client_S.send(msg.encode())
 
-responese = Client_S.recv(1024).decode()
+responese = Client_S.recv(4096).decode()
 
 print("Received from server: ", responese)
 
