@@ -1,6 +1,7 @@
 import socket
 import os
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
 
 Host = "127.0.0.1"
 Port = 5000
@@ -16,6 +17,12 @@ responese = Client_S.recv(4096).decode()
 
 print("Received from server: ", responese)
 
+server_public_key_text = responese[4:-1]
+
+server_public_key = serialization.load_pem_public_key(
+	server_public_key_text.encode()
+)
+
 # Generate client RSA key pair
 client_private_key = rsa.generate_private_key(
 	public_exponent=65537,
@@ -29,6 +36,33 @@ session_key = os.urandom(32)
 
 print("Client RSA key pair generated.")
 print("AES session key generated.")
+
+encrypted_session_key = server_public_key.encrypt(
+	session_key,
+	padding.OAEP(
+		mgf=padding.MGF1(algorithm=hashes.SHA256()),
+		algorithm=hashes.SHA256(),
+		label=None
+	)
+)
+
+print("AES session key encrypted.")
+
+client_public_key_bytes = client_public_key.public_bytes(
+	encoding=serialization.Encoding.PEM,
+	format=serialization.PublicFormat.SubjectPublicKeyInfo
+)
+
+ec_packet = (
+	b"(EC,AES"
+	+ encrypted_session_key
+	+ b","
+	+ client_public_key_bytes
+	+ b")"
+)
+
+print("Ec packet created.")
+Client_S.send(ec_packet)
 
 
 Client_S.close()

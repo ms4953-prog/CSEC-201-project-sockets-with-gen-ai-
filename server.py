@@ -38,6 +38,9 @@ elif msg == "(SS,RFMP,v1.0,1)":
 
     Client_S.send(response)
 
+ec_packet = Client_S.recv(4096)
+print("Received EC packet from client: ", ec_packet)
+
 Client_S.close()
 Server_S.close()
 
