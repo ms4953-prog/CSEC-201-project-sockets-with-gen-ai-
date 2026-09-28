@@ -81,6 +81,11 @@ while True:
 
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
 
+    elif command == "cd":
+        directory_name = input("What directory do you want to enter: ")
+
+        command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 
