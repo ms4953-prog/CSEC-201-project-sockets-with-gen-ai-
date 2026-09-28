@@ -55,10 +55,14 @@ client_public_key_bytes = client_public_key.public_bytes(
 
 encrypted_session_key_text = encrypted_session_key.hex()
 
+username = "mubeen"
+
 ec_packet = (
     b"(EC,AES,"
     + encrypted_session_key_text.encode()
     + b","
+    + username.encode()
+    + b":"
     + client_public_key_bytes
     + b")"
 )
@@ -66,7 +70,15 @@ ec_packet = (
 print("Ec packet created.")
 Client_S.send(ec_packet)
 
-
+while True:
+    command = input("ENter the command: ")
+    if command == "exit":
+        break
+    command_data_packet = "(CM,prompt," + command + ")"
+    Client_S.send(command_data_packet.encode())
+    response = Client_S.recv(4096).decode
+    print("Received from server:",response)
+	
 Client_S.close()
 
 print("Client closed.")

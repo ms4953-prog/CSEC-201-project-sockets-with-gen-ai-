@@ -42,7 +42,7 @@ ec_packet = Client_S.recv(4096)
 print("Received EC packet from client: ", ec_packet)
 
 encrypted_session_key = bytes.fromhex(
-    ec_packet.split(b",", 2)[2].split(b",-----BEGIN PUBLIC KEY-----", 1)[0].decode()
+    ec_packet.split(b",", 2)[2].split(b",mubeen:", 1)[0].decode()
 )
 print("Encrypted AES session key extracted.")
 
@@ -56,6 +56,18 @@ session_key = private_key.decrypt(
 )
 
 print("AES session key decrypted successfully.")
+
+while True:
+
+    command_data_packet = Client_S.recv(4096).decode()
+
+    print("Received command packet:", command_data_packet)
+
+    if command_data_packet == "":
+        break
+
+    Client_S.send("(SC)".encode())
+
 
 Client_S.close()
 Server_S.close()
