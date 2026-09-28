@@ -1,4 +1,5 @@
 import socket
+import os
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 Host = "127.0.0.1"
@@ -65,8 +66,15 @@ while True:
 
     if command_data_packet == "":
         break
+    if command_data_packet.startswith("(CM,prompt,mkdir "):
 
-    Client_S.send("(SC)".encode())
+        directory_name = command_data_packet[17:-1]
+
+        print("Creating the directory:", directory_name)
+
+        os.mkdir(directory_name)
+        print("Created at:", os.path.abspath(directory_name))
+        Client_S.send("(SC)".encode())
 
 
 Client_S.close()

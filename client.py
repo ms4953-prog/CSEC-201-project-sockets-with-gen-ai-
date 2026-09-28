@@ -69,15 +69,26 @@ ec_packet = (
 
 print("Ec packet created.")
 Client_S.send(ec_packet)
-
 while True:
-    command = input("ENter the command: ")
+
+    command = input("Enter the command: ")
+
     if command == "exit":
         break
-    command_data_packet = "(CM,prompt," + command + ")"
+
+    if command == "mkdir":
+        directory_name = input("What do you want to name the directory: ")
+
+        command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
+
+    else:
+        command_data_packet = "(CM,prompt," + command + ")"
+
     Client_S.send(command_data_packet.encode())
-    response = Client_S.recv(4096).decode
-    print("Received from server:",response)
+
+    response = Client_S.recv(4096).decode()
+
+    print("Received from server:", response)
 	
 Client_S.close()
 
