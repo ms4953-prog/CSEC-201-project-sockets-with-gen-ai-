@@ -88,6 +88,22 @@ while True:
         print("Directory removed.")
         Client_S.send("(SC)".encode())
 
+    elif command_data_packet.startswith("(CM,prompt,del "):
+        file_name = command_data_packet[15:-1]
+        print("Deleting the file:", file_name)
+        os.remove(file_name)
+        print("File deleted.")
+        Client_S.send("(SC)".encode())
+        
+    elif command_data_packet.startswith("(CM,prompt,ren "):
+        names = command_data_packet[15:-1].split(" ")
+        old_name = names[0]
+        new_name = names[1]
+        print("Renaming", old_name, "to", new_name)
+        os.rename(old_name, new_name)
+        print("File or directory renamed.")
+        Client_S.send("(SC)".encode())
+
 
 Client_S.close()
 Server_S.close()

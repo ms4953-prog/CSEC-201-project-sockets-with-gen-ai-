@@ -88,6 +88,15 @@ while True:
         directory_name = input("What directory do you want to remove: ")
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
 
+    elif command == "del":
+        file_name = input("What file do you want to delete: ")
+        command_data_packet = "(CM,prompt," + command + " " + file_name + ")"
+
+    elif command == "ren":
+        old_name = input("What is the current name: ")
+        new_name = input("What is the new name: ")
+        command_data_packet = "(CM,prompt," + command + " " + old_name + " " + new_name + ")"
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 
