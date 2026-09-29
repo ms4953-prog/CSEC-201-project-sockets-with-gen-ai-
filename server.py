@@ -68,27 +68,24 @@ while True:
         break
 
     if command_data_packet.startswith("(CM,prompt,mkdir "):
-
         directory_name = command_data_packet[17:-1]
-
         print("Creating the directory:", directory_name)
-
         os.mkdir(directory_name)
-
         print("Created at:", os.path.abspath(directory_name))
-
         Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,prompt,cd "):
-
         directory_name = command_data_packet[14:-1]
-
         print("Changing directory to:", directory_name)
-
         os.chdir(directory_name)
-
         print("Current directory:", os.getcwd())
-
+        Client_S.send("(SC)".encode())
+    
+    elif command_data_packet.startswith("(CM,prompt,rmdir "):
+        directory_name = command_data_packet[17:-1]
+        print("Removing the directory:", directory_name)
+        os.rmdir(directory_name)
+        print("Directory removed.")
         Client_S.send("(SC)".encode())
 
 

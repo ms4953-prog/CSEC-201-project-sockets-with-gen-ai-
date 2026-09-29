@@ -78,12 +78,14 @@ while True:
 
     if command == "mkdir":
         directory_name = input("What do you want to name the directory: ")
-
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
 
     elif command == "cd":
         directory_name = input("What directory do you want to enter: ")
-
+        command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
+    
+    elif command == "rmdir":
+        directory_name = input("What directory do you want to remove: ")
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
 
     else:
