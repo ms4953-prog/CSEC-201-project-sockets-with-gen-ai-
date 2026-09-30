@@ -73,28 +73,24 @@ while True:
         print("Creating the directory:", directory_name)
         os.mkdir(directory_name)
         print("Created at:", os.path.abspath(directory_name))
-        Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,prompt,cd "):
         directory_name = command_data_packet[14:-1]
         print("Changing directory to:", directory_name)
         os.chdir(directory_name)
         print("Current directory:", os.getcwd())
-        Client_S.send("(SC)".encode())
     
     elif command_data_packet.startswith("(CM,prompt,rmdir "):
         directory_name = command_data_packet[17:-1]
         print("Removing the directory:", directory_name)
         os.rmdir(directory_name)
         print("Directory removed.")
-        Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,prompt,del "):
         file_name = command_data_packet[15:-1]
         print("Deleting the file:", file_name)
         os.remove(file_name)
         print("File deleted.")
-        Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,prompt,ren "):
         names = command_data_packet[15:-1].split(" ")
@@ -103,7 +99,6 @@ while True:
         print("Renaming", old_name, "to", new_name)
         os.rename(old_name, new_name)
         print("File or directory renamed.")
-        Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,openRead,"):
         file_name = command_data_packet[13:-1]
@@ -113,7 +108,6 @@ while True:
         file.close()
         print("File contents:", file_data)
         Client_S.send(file_data.encode())
-        Client_S.send("(SC)".encode())
 
     elif command_data_packet.startswith("(CM,openWrite,"):
         file_name = command_data_packet[14:-1]
@@ -121,7 +115,7 @@ while True:
         file = open(file_name, "w")
         file.close()
         print("File created.")
-        Client_S.send("(SC)".encode())
+
     elif command_data_packet.startswith("(DP,"):
         text = command_data_packet[4:-1]
         print("Received data:", text)
