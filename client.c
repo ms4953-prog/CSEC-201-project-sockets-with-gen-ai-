@@ -1,8 +1,36 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+
+int send_packet(int client_socket, char packet[]){
+    size_t length = strlen(packet);
+    size_t total = 0;
+
+    while(total < length){
+        ssize_t sent = send(client_socket, packet + total,
+                            length - total, MSG_NOSIGNAL);
+
+        if(sent < 0){
+            if(errno == EINTR){
+                continue;
+            }
+
+            perror("Send error");
+            return -1;
+        }
+        else if(sent == 0){
+            printf("Could not finish sending the packet.\n");
+            return -1;
+        }
+
+        total = total + (size_t)sent;
+    }
+
+    return 0;
+}
 
 int main(){
     char filename[256];
@@ -60,17 +88,15 @@ int main(){
 
     char start_packet[] = "(SS,RFMP,v1.0,0)";
 
-    if(send(client_socket, start_packet,
-            strlen(start_packet), 0) < 0){
-        perror("Send error");
+    if(send_packet(client_socket, start_packet) < 0){
         close(client_socket);
         return 1;
     }
 
     printf("Sent: %s\n", start_packet);
 
-    int received = recv(client_socket, response,
-                        sizeof(response) - 1, 0);
+    ssize_t received = recv(client_socket, response,
+                            sizeof(response) - 1, 0);
 
     if(received < 0){
         perror("Setup receive error");
@@ -102,9 +128,7 @@ int main(){
         return 1;
     }
 
-    if(send(client_socket, command_packet,
-            (size_t)length, 0) < 0){
-        perror("Send error");
+    if(send_packet(client_socket, command_packet) < 0){
         close(client_socket);
         return 1;
     }
