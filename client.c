@@ -16,11 +16,26 @@ int main(){
         return 1;
     }
 
+    if(strchr(filename, '\n') == NULL && !feof(stdin)){
+        printf("File name is too long.\n");
+        return 1;
+    }
+
     filename[strcspn(filename, "\n")] = '\0';
 
     if(filename[0] == '\0'){
         printf("File name cannot be empty.\n");
         return 1;
+    }
+
+    for(int i = 0; filename[i] != '\0'; i++){
+        if(filename[i] == ',' ||
+           filename[i] == '(' ||
+           filename[i] == ')' ||
+           filename[i] == '\r'){
+            printf("File name contains a character that conflicts with the packet format.\n");
+            return 1;
+        }
     }
 
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
