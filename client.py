@@ -97,6 +97,14 @@ while True:
         new_name = input("What is the new name: ")
         command_data_packet = "(CM,prompt," + command + " " + old_name + " " + new_name + ")"
 
+    elif command == "openRead":
+        file_name = input("What file do you want to read: ")
+        command_data_packet = "(CM,openRead," + file_name + ")"
+
+    elif command == "openWrite":
+        file_name = input("What file do you want to write: ")
+        command_data_packet = "(CM,openWrite," + file_name + ")"
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 

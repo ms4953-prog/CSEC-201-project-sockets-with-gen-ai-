@@ -94,7 +94,7 @@ while True:
         os.remove(file_name)
         print("File deleted.")
         Client_S.send("(SC)".encode())
-        
+
     elif command_data_packet.startswith("(CM,prompt,ren "):
         names = command_data_packet[15:-1].split(" ")
         old_name = names[0]
@@ -104,6 +104,23 @@ while True:
         print("File or directory renamed.")
         Client_S.send("(SC)".encode())
 
+    elif command_data_packet.startswith("(CM,openRead,"):
+        file_name = command_data_packet[13:-1]
+        print("Reading the file:", file_name)
+        file = open(file_name, "r")
+        file_data = file.read()
+        file.close()
+        print("File contents:", file_data)
+        Client_S.send(file_data.encode())
+        Client_S.send("(SC)".encode())
+
+    elif command_data_packet.startswith("(CM,openWrite,"):
+        file_name = command_data_packet[14:-1]
+        print("Opening the file for writing:", file_name)
+        file = open(file_name, "w")
+        file.close()
+        print("File created.")
+        Client_S.send("(SC)".encode())
 
 Client_S.close()
 Server_S.close()
