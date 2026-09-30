@@ -104,6 +104,15 @@ while True:
     elif command == "openWrite":
         file_name = input("What file do you want to write: ")
         command_data_packet = "(CM,openWrite," + file_name + ")"
+        Client_S.send(command_data_packet.encode())
+        response = Client_S.recv(4096).decode()
+        print("Received from server:", response)
+        text = input("What do you want to write: ")
+        packet = "(DP," + text + ")"
+        Client_S.send(packet.encode())
+        response = Client_S.recv(4096).decode()
+        print("Received from server:", response)
+        continue
 
     else:
         command_data_packet = "(CM,prompt," + command + ")"

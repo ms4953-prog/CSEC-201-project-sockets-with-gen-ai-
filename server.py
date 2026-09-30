@@ -58,6 +58,7 @@ session_key = private_key.decrypt(
 
 print("AES session key decrypted successfully.")
 
+file_name = ""
 while True:
 
     command_data_packet = Client_S.recv(4096).decode()
@@ -121,7 +122,15 @@ while True:
         file.close()
         print("File created.")
         Client_S.send("(SC)".encode())
+    elif command_data_packet.startswith("(DP,"):
+        text = command_data_packet[4:-1]
+        print("Received data:", text)
+        file = open(file_name, "w")
+        file.write(text)
+        file.close()
+        print("Data written to file.")
 
+    Client_S.send("(SC)".encode())
 Client_S.close()
 Server_S.close()
 
