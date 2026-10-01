@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+/* Send the entire packet, even if send() sends only part of it. */
 int send_packet(int client_socket, char packet[]){
     size_t length = strlen(packet);
     size_t total = 0;
@@ -32,11 +33,12 @@ int send_packet(int client_socket, char packet[]){
     return 0;
 }
 
-int main(){
+int main(void){
     char filename[256];
     char response[4096];
     char command_packet[300];
 
+    /* Read and validate the file name. */
     printf("Enter the file name to read: ");
 
     if(fgets(filename, sizeof(filename), stdin) == NULL){
@@ -66,6 +68,7 @@ int main(){
         }
     }
 
+    /* Create the client socket. */
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     if(client_socket < 0){
@@ -73,11 +76,13 @@ int main(){
         return 1;
     }
 
+    /* Set the server address and port. */
     struct sockaddr_in server_address = {0};
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(5000);
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+    /* Connect to the server. */
     if(connect(client_socket,
                (struct sockaddr *)&server_address,
                sizeof(server_address)) < 0){
@@ -86,6 +91,7 @@ int main(){
         return 1;
     }
 
+    /* Setup phase: request nonsecure communication. */
     char start_packet[] = "(SS,RFMP,v1.0,0)";
 
     if(send_packet(client_socket, start_packet) < 0){
@@ -118,6 +124,7 @@ int main(){
         return 1;
     }
 
+    /* Operation phase: create the openRead request. */
     int length = snprintf(command_packet,
                           sizeof(command_packet),
                           "(CM,openRead,%s)", filename);
@@ -135,6 +142,7 @@ int main(){
 
     printf("Sent: %s\n", command_packet);
 
+    /* Receive and display the server response. */
     received = recv(client_socket, response,
                     sizeof(response) - 1, 0);
 
@@ -148,19 +156,29 @@ int main(){
         close(client_socket);
         return 1;
     }
-    else{
-        response[received] = '\0';
 
-        if(strncmp(response, "(EE,", 4) == 0){
-            printf("Server reported an error: %s\n", response);
-            close(client_socket);
-            return 1;
-        }
-        else{
-            printf("Server response: %s\n", response);
-        }
+    response[received] = '\0';
+
+    int server_error = 0;
+
+    if(strncmp(response, "(EE,", 4) == 0){
+        printf("Server reported an error: %s\n", response);
+        server_error = 1;
+    }
+    else{
+        printf("Server response: %s\n", response);
     }
 
+    /* Closing phase: tell the server the client has finished. */
+    char end_packet[] = "(End)";
+
+    if(send_packet(client_socket, end_packet) < 0){
+        close(client_socket);
+        return 1;
+    }
+
+    printf("Sent: %s\n", end_packet);
+
     close(client_socket);
-    return 0;
+    return server_error;
 }
