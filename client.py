@@ -129,7 +129,7 @@ while True:
             print("Received Exception from server:",responese)
         else:
             try:
-                decrypted_file_data = decrypt_data(response,session_key)
+                decrypted_file_data = decrypt_data(responese,session_key)
                 print("File contents (Decrypted):", decrypted_file_data)
             except Exception:
                 print("Received from server:",responese)

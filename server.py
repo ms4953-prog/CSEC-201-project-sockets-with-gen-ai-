@@ -176,7 +176,7 @@ while True:
             else:
                 print("File does not exist.")
 
-        elif command_data_packet.startswith("(CM,prompt,echo )"):
+        elif command_data_packet.startswith("(CM,prompt,echo "):
             text = command_data_packet[16:-1]
             print("Echo output:",text)
         
@@ -192,7 +192,7 @@ while True:
         error_packet = f"(EE,500,{str(e)})"
         print("Sending Error Packet:",error_packet)
         Client_S.send(error_packet.encode())
-        
+
 Client_S.close()
 Server_S.close()
 
