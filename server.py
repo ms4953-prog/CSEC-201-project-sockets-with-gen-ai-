@@ -150,6 +150,10 @@ while True:
             print("File contents:", file_data)
         else:
             print("File does not exist.")
+
+    elif command_data_packet.startswith("(CM,prompt,echo )"):
+        text = command_data_packet[16:-1]
+        print("Echo output:",text)
 	
 
     Client_S.send("(SC)".encode())

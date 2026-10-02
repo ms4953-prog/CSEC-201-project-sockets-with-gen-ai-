@@ -122,6 +122,10 @@ while True:
         file_name = input("Enter the file name to display: ")
         command_data_packet = "(CM,prompt," + command + " " + file_name + ")"
 
+    elif command == "echo":
+        text = input("Enter text to display: ")
+        command_data_packet = "(CM,prompt," + command + " " + text + ")"
+    
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 
