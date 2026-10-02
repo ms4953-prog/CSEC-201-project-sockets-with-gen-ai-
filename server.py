@@ -140,7 +140,8 @@ while True:
         print("File created.")
 
     elif command_data_packet.startswith("(DP,"):
-        text = command_data_packet[4:-1]
+        encrypted_text = command_data_packet[4:-1]
+        text = decrypt_data(encrypted_text, session_key)
         print("Received data:", text)
         file = open(file_name, "w")
         file.write(text)

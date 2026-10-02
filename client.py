@@ -129,8 +129,10 @@ while True:
         Client_S.send(command_data_packet.encode())
         response = Client_S.recv(4096).decode()
         print("Received from server:", response)
+
         text = input("What do you want to write: ")
-        packet = "(DP," + text + ")"
+        encrypted_text = encrypt_data(text, session_key)
+        packet = "(DP," + encrypted_text + ")"
         Client_S.send(packet.encode())
         response = Client_S.recv(4096).decode()
         print("Received from server:", response)
