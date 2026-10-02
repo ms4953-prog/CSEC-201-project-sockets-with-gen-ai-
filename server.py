@@ -123,6 +123,12 @@ while True:
         file.write(text)
         file.close()
         print("Data written to file.")
+    
+    elif command_data_packet.startswith("(CM,prompt,ls)"):
+        print("Listing directory contents:")
+        contents = os.listdir(".")
+        print("Contents:", contents)
+	
 
     Client_S.send("(SC)".encode())
 Client_S.close()
