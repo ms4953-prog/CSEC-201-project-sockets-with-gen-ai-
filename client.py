@@ -125,11 +125,14 @@ while True:
         Client_S.send(command_data_packet.encode())
         responese = Client_S.recv(4096).decode()
 
-        try:
-            decrypted_file_data = decrypt_data(response,session_key)
-            print("File contents (Decrypted):", decrypted_file_data)
-        except Exception:
-            print("Received from server:",responese)
+        if responese.startswith("(EE,"):
+            print("Received Exception from server:",responese)
+        else:
+            try:
+                decrypted_file_data = decrypt_data(response,session_key)
+                print("File contents (Decrypted):", decrypted_file_data)
+            except Exception:
+                print("Received from server:",responese)
         continue
 
     elif command == "openWrite":
