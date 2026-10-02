@@ -118,6 +118,10 @@ while True:
         file_name = input("Enter the file name to create: ")
         command_data_packet = "(CM,prompt," + command + " " + file_name + ")"
 
+    elif command == "cat":
+        file_name = input("Enter the file name to display: ")
+        command_data_packet = "(CM,prompt," + command + " " + file_name + ")"
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 

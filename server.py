@@ -139,7 +139,17 @@ while True:
         print("Creating empty file:", file_name)
         open(file_name, "a").close()
         print("File created.")
-    
+
+    elif command_data_packet.startswith("(CM,prompt,cat "):
+        file_name = command_data_packet[15:-1]
+        print("Displaying file contents for:", file_name)
+        if os.path.exists(file_name):
+            file = open(file_name, "r")
+            file_data = file.read()
+            file.close()
+            print("File contents:", file_data)
+        else:
+            print("File does not exist.")
 	
 
     Client_S.send("(SC)".encode())
