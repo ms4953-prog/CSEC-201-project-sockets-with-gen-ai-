@@ -122,6 +122,15 @@ while True:
     elif command == "openRead":
         file_name = input("What file do you want to read: ")
         command_data_packet = "(CM,openRead," + file_name + ")"
+        Client_S.send(command_data_packet.encode())
+        responese = Client_S.recv(4096).decode()
+
+        try:
+            decrypted_file_data = decrypt_data(response,session_key)
+            print("File contents (Decrypted):", decrypted_file_data)
+        except Exception:
+            print("Received from server:",responese)
+        continue
 
     elif command == "openWrite":
         file_name = input("What file do you want to write: ")

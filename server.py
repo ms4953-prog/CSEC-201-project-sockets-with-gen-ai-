@@ -130,7 +130,8 @@ while True:
         file_data = file.read()
         file.close()
         print("File contents:", file_data)
-        Client_S.send(file_data.encode())
+        encrypted_file_data = encrypt_data(file_data, session_key)
+        Client_S.send(encrypted_file_data.encode())
 
     elif command_data_packet.startswith("(CM,openWrite,"):
         file_name = command_data_packet[14:-1]
