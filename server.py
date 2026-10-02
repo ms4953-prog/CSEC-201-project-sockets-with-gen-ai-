@@ -133,6 +133,13 @@ while True:
         print("Current working directory:")
         cwd = os.getcwd()
         print("Path:", cwd)
+
+    elif command_data_packet.startswith("(CM,prompt,touch "):
+        file_name = command_data_packet[17:-1]
+        print("Creating empty file:", file_name)
+        open(file_name, "a").close()
+        print("File created.")
+    
 	
 
     Client_S.send("(SC)".encode())

@@ -114,6 +114,10 @@ while True:
         print("Received from server:", response)
         continue
 
+    elif command == "touch":
+        file_name = input("Enter the file name to create: ")
+        command_data_packet = "(CM,prompt," + command + " " + file_name + ")"
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 
