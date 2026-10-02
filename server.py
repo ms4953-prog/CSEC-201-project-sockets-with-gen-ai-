@@ -83,105 +83,116 @@ print("AES session key decrypted successfully.")
 
 file_name = ""
 while True:
+    try:
+        command_data_packet = Client_S.recv(4096).decode()
 
-    command_data_packet = Client_S.recv(4096).decode()
+        print("Received command packet:", command_data_packet)
 
-    print("Received command packet:", command_data_packet)
+        if command_data_packet == "":
+            break
 
-    if command_data_packet == "":
-        break
+        if command_data_packet.startswith("(CM,prompt,mkdir "):
+            directory_name = command_data_packet[17:-1]
+            print("Creating the directory:", directory_name)
+            os.mkdir(directory_name)
+            print("Created at:", os.path.abspath(directory_name))
 
-    if command_data_packet.startswith("(CM,prompt,mkdir "):
-        directory_name = command_data_packet[17:-1]
-        print("Creating the directory:", directory_name)
-        os.mkdir(directory_name)
-        print("Created at:", os.path.abspath(directory_name))
+        elif command_data_packet.startswith("(CM,prompt,cd "):
+            directory_name = command_data_packet[14:-1]
+            print("Changing directory to:", directory_name)
+            os.chdir(directory_name)
+            print("Current directory:", os.getcwd())
+        
+        elif command_data_packet.startswith("(CM,prompt,rmdir "):
+            directory_name = command_data_packet[17:-1]
+            print("Removing the directory:", directory_name)
+            os.rmdir(directory_name)
+            print("Directory removed.")
 
-    elif command_data_packet.startswith("(CM,prompt,cd "):
-        directory_name = command_data_packet[14:-1]
-        print("Changing directory to:", directory_name)
-        os.chdir(directory_name)
-        print("Current directory:", os.getcwd())
-    
-    elif command_data_packet.startswith("(CM,prompt,rmdir "):
-        directory_name = command_data_packet[17:-1]
-        print("Removing the directory:", directory_name)
-        os.rmdir(directory_name)
-        print("Directory removed.")
+        elif command_data_packet.startswith("(CM,prompt,del "):
+            file_name = command_data_packet[15:-1]
+            print("Deleting the file:", file_name)
+            os.remove(file_name)
+            print("File deleted.")
 
-    elif command_data_packet.startswith("(CM,prompt,del "):
-        file_name = command_data_packet[15:-1]
-        print("Deleting the file:", file_name)
-        os.remove(file_name)
-        print("File deleted.")
+        elif command_data_packet.startswith("(CM,prompt,ren "):
+            names = command_data_packet[15:-1].split(" ")
+            old_name = names[0]
+            new_name = names[1]
+            print("Renaming", old_name, "to", new_name)
+            os.rename(old_name, new_name)
+            print("File or directory renamed.")
 
-    elif command_data_packet.startswith("(CM,prompt,ren "):
-        names = command_data_packet[15:-1].split(" ")
-        old_name = names[0]
-        new_name = names[1]
-        print("Renaming", old_name, "to", new_name)
-        os.rename(old_name, new_name)
-        print("File or directory renamed.")
-
-    elif command_data_packet.startswith("(CM,openRead,"):
-        file_name = command_data_packet[13:-1]
-        print("Reading the file:", file_name)
-        file = open(file_name, "r")
-        file_data = file.read()
-        file.close()
-        print("File contents:", file_data)
-        encrypted_file_data = encrypt_data(file_data, session_key)
-        Client_S.send(encrypted_file_data.encode())
-
-    elif command_data_packet.startswith("(CM,openWrite,"):
-        file_name = command_data_packet[14:-1]
-        print("Opening the file for writing:", file_name)
-        file = open(file_name, "w")
-        file.close()
-        print("File created.")
-
-    elif command_data_packet.startswith("(DP,"):
-        encrypted_text = command_data_packet[4:-1]
-        text = decrypt_data(encrypted_text, session_key)
-        print("Received data:", text)
-        file = open(file_name, "w")
-        file.write(text)
-        file.close()
-        print("Data written to file.")
-    
-    elif command_data_packet.startswith("(CM,prompt,ls)"):
-        print("Listing directory contents:")
-        contents = os.listdir(".")
-        print("Contents:", contents)
-
-    elif command_data_packet.startswith("(CM,prompt,pwd)"):
-        print("Current working directory:")
-        cwd = os.getcwd()
-        print("Path:", cwd)
-
-    elif command_data_packet.startswith("(CM,prompt,touch "):
-        file_name = command_data_packet[17:-1]
-        print("Creating empty file:", file_name)
-        open(file_name, "a").close()
-        print("File created.")
-
-    elif command_data_packet.startswith("(CM,prompt,cat "):
-        file_name = command_data_packet[15:-1]
-        print("Displaying file contents for:", file_name)
-        if os.path.exists(file_name):
+        elif command_data_packet.startswith("(CM,openRead,"):
+            file_name = command_data_packet[13:-1]
+            print("Reading the file:", file_name)
             file = open(file_name, "r")
             file_data = file.read()
             file.close()
             print("File contents:", file_data)
-        else:
-            print("File does not exist.")
+            encrypted_file_data = encrypt_data(file_data, session_key)
+            Client_S.send(encrypted_file_data.encode())
 
-    elif command_data_packet.startswith("(CM,prompt,echo )"):
-        text = command_data_packet[16:-1]
-        print("Echo output:",text)
-	
+        elif command_data_packet.startswith("(CM,openWrite,"):
+            file_name = command_data_packet[14:-1]
+            print("Opening the file for writing:", file_name)
+            file = open(file_name, "w")
+            file.close()
+            print("File created.")
 
-    Client_S.send("(SC)".encode())
+        elif command_data_packet.startswith("(DP,"):
+            encrypted_text = command_data_packet[4:-1]
+            text = decrypt_data(encrypted_text, session_key)
+            print("Received data:", text)
+            file = open(file_name, "w")
+            file.write(text)
+            file.close()
+            print("Data written to file.")
+        
+        elif command_data_packet.startswith("(CM,prompt,ls)"):
+            print("Listing directory contents:")
+            contents = os.listdir(".")
+            print("Contents:", contents)
+
+        elif command_data_packet.startswith("(CM,prompt,pwd)"):
+            print("Current working directory:")
+            cwd = os.getcwd()
+            print("Path:", cwd)
+
+        elif command_data_packet.startswith("(CM,prompt,touch "):
+            file_name = command_data_packet[17:-1]
+            print("Creating empty file:", file_name)
+            open(file_name, "a").close()
+            print("File created.")
+
+        elif command_data_packet.startswith("(CM,prompt,cat "):
+            file_name = command_data_packet[15:-1]
+            print("Displaying file contents for:", file_name)
+            if os.path.exists(file_name):
+                file = open(file_name, "r")
+                file_data = file.read()
+                file.close()
+                print("File contents:", file_data)
+            else:
+                print("File does not exist.")
+
+        elif command_data_packet.startswith("(CM,prompt,echo )"):
+            text = command_data_packet[16:-1]
+            print("Echo output:",text)
+        
+
+        Client_S.send("(SC)".encode())
+
+    except FileNotFoundError as e:
+        error_packet = "(EE,404,File or directory not found)"
+        print("Sending Error Packet:",error_packet)
+        Client_S.send(error_packet.encode())
+
+    except Exception as e:
+        error_packet = f"(EE,500,{str(e)})"
+        print("Sending Error Packet:",error_packet)
+        Client_S.send(error_packet.encode())
+        
 Client_S.close()
 Server_S.close()
 
