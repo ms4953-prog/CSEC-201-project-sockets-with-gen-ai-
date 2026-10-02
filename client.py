@@ -2,6 +2,28 @@ import socket
 import os
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding as sym_padding
+
+def encrypt_data(plain_text: str, key: bytes) -> str:
+    iv = os.urandom(16)
+    padder = sym_padding.PKCS7(128).padder()
+    padded_data = padder.update(plain_text.encode()) + padder.finalize()
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+    return (iv + ciphertext).hex()
+
+def decrypt_data(hex_data: str, key: bytes) -> str:
+    raw_data = bytes.fromhex(hex_data)
+    iv = raw_data[:16]
+    ciphertext = raw_data[16:]
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+    padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+    unpadder = sym_padding.PKCS7(128).unpadder()
+    data = unpadder.update(padded_data) + unpadder.finalize()
+    return data.decode()
 
 Host = "127.0.0.1"
 Port = 5000
