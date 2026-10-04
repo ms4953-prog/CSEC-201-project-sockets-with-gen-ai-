@@ -80,7 +80,6 @@ int connect_to_server(const char server_ip[], unsigned short port){
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(port);
 
-    /* Convert the IP address text into an IPv4 address. */
     int address_result = inet_pton(AF_INET, server_ip,
                                    &server_address.sin_addr);
 
@@ -105,6 +104,35 @@ int connect_to_server(const char server_ip[], unsigned short port){
     }
 
     return client_socket;
+}
+
+/* Receive one TCP chunk and retry interrupted recv() calls. */
+ssize_t receive_response(int client_socket,
+                         char response[],
+                         size_t capacity){
+    if(capacity < 2){
+        printf("Response buffer is too small.\n");
+        return -1;
+    }
+
+    ssize_t received;
+
+    do{
+        received = recv(client_socket, response, capacity - 1, 0);
+    }while(received < 0 && errno == EINTR);
+
+    if(received < 0){
+        perror("Receive error");
+        return -1;
+    }
+
+    if(received == 0){
+        printf("Server closed the connection without a response.\n");
+        return 0;
+    }
+
+    response[received] = '\0';
+    return received;
 }
 
 int main(void){
@@ -134,21 +162,14 @@ int main(void){
 
     printf("Sent: %s\n", start_packet);
 
-    ssize_t received = recv(client_socket, response,
-                            sizeof(response) - 1, 0);
+    ssize_t received = receive_response(client_socket, response,
+                                         sizeof(response));
 
-    if(received < 0){
-        perror("Setup receive error");
-        close(client_socket);
-        return 1;
-    }
-    else if(received == 0){
-        printf("Server closed the connection during setup.\n");
+    if(received <= 0){
         close(client_socket);
         return 1;
     }
 
-    response[received] = '\0';
     printf("Received: %s\n", response);
 
     if(strcmp(response, "(CC)") != 0){
@@ -175,22 +196,15 @@ int main(void){
 
     printf("Sent: %s\n", command_packet);
 
-    /* Receive the file response. */
-    received = recv(client_socket, response,
-                    sizeof(response) - 1, 0);
+    /* Receive the file response using the same helper. */
+    received = receive_response(client_socket, response,
+                                sizeof(response));
 
-    if(received < 0){
-        perror("Receive error");
-        close(client_socket);
-        return 1;
-    }
-    else if(received == 0){
-        printf("Server closed the connection without a file response.\n");
+    if(received <= 0){
         close(client_socket);
         return 1;
     }
 
-    response[received] = '\0';
     int server_error = 0;
 
     /* Display a server exception. */
