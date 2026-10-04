@@ -156,7 +156,7 @@ def handling_multiclient(Client_S, Client_address):
             print("Received command packet:", command_data_packet)
 
             # closes the client connection
-            if command_data_packet == "(CL)":
+            if command_data_packet == "(End)":
                 print("Client is closing the connection.")
                 break
 
@@ -241,7 +241,8 @@ def handling_multiclient(Client_S, Client_address):
                     elif algorithm == "Caesar":
                         file_data = caesar_encrypt(file_data,session_key)
 
-                Client_S.send(file_data.encode())
+                response = "(SC," + file_data + ")"
+                Client_S.send(response.encode())
                 continue
 
             # makes a file so data can be written in it
