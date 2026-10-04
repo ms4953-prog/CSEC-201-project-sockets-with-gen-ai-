@@ -71,32 +71,28 @@ def handling_multiclient(Client_S, Client_address):
 
     if msg == "(SS,RFMP,v1.0,0)":
         Client_S.send("(CC)".encode())
-
+        secure_mode = 0
+    
     elif msg == "(SS,RFMP,v1.0,1)":
         response = b"(CC," + public_key_bytes + b")"
-
         Client_S.send(response)
-
-    ec_packet = Client_S.recv(4096)
-
-    print("Received EC packet from client: ", ec_packet)
-
-    encrypted_session_key = bytes.fromhex(
+        secure_mode = 1
+        ec_packet = Client_S.recv(4096)
+        print("Received EC packet from client: ", ec_packet)
+       
+        encrypted_session_key = bytes.fromhex(
         ec_packet.split(b",", 2)[2].split(b",mubeen:", 1)[0].decode()
     )
-
-    print("Encrypted AES session key extracted.")
-
-    session_key = private_key.decrypt(
-        encrypted_session_key,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
+        print("Encrypted AES session key extracted.")
+        session_key = private_key.decrypt(
+            encrypted_session_key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
         )
     )
-
-    print("AES session key decrypted successfully.")
+        print("AES session key decrypted successfully.")
 
     file_name = ""
 
@@ -157,8 +153,12 @@ def handling_multiclient(Client_S, Client_address):
                 file_data = file.read()
                 file.close()
                 print("File contents:", file_data)
-                encrypted_file_data = encrypt_data(file_data, session_key)
-                Client_S.send(encrypted_file_data.encode())
+                if secure_mode == 1:
+                    encrypted_file_data = encrypt_data(file_data, session_key)
+                    Client_S.send(encrypted_file_data.encode())
+                else:
+                    Client_S.send(file_data.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,openWrite,"):
                 file_name = command_data_packet[14:-1]
