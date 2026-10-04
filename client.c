@@ -67,6 +67,46 @@ int read_filename(char filename[], size_t capacity){
     return 0;
 }
 
+/* Create the TCP socket and connect it to the Python server. */
+int connect_to_server(const char server_ip[], unsigned short port){
+    int client_socket = socket(AF_INET, SOCK_STREAM, 0);
+
+    if(client_socket < 0){
+        perror("Socket error");
+        return -1;
+    }
+
+    struct sockaddr_in server_address = {0};
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(port);
+
+    /* Convert the IP address text into an IPv4 address. */
+    int address_result = inet_pton(AF_INET, server_ip,
+                                   &server_address.sin_addr);
+
+    if(address_result != 1){
+        if(address_result == 0){
+            printf("Invalid server IP address.\n");
+        }
+        else{
+            perror("Address conversion error");
+        }
+
+        close(client_socket);
+        return -1;
+    }
+
+    if(connect(client_socket,
+               (struct sockaddr *)&server_address,
+               sizeof(server_address)) < 0){
+        perror("Connection error");
+        close(client_socket);
+        return -1;
+    }
+
+    return client_socket;
+}
+
 int main(void){
     char filename[256];
     char response[4096];
@@ -77,26 +117,10 @@ int main(void){
         return 1;
     }
 
-    /* Create the client socket. */
-    int client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    /* Use the same address and port as the Python programs. */
+    int client_socket = connect_to_server("127.0.0.1", 5000);
 
     if(client_socket < 0){
-        perror("Socket error");
-        return 1;
-    }
-
-    /* Set the server address and port. */
-    struct sockaddr_in server_address = {0};
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(5000);
-    server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    /* Connect to the server. */
-    if(connect(client_socket,
-               (struct sockaddr *)&server_address,
-               sizeof(server_address)) < 0){
-        perror("Connection error");
-        close(client_socket);
         return 1;
     }
 
