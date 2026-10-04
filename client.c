@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-/* Send the entire packet, even if send() sends only part of it. */
+/* Send the whole packet, even when send() sends only part. */
 int send_packet(int client_socket, char packet[]){
     size_t length = strlen(packet);
     size_t total = 0;
@@ -22,7 +22,8 @@ int send_packet(int client_socket, char packet[]){
             perror("Send error");
             return -1;
         }
-        else if(sent == 0){
+
+        if(sent == 0){
             printf("Could not finish sending the packet.\n");
             return -1;
         }
@@ -82,7 +83,7 @@ int main(void){
     server_address.sin_port = htons(5000);
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    /* Connect to the server. */
+    /* Connect to the Python server. */
     if(connect(client_socket,
                (struct sockaddr *)&server_address,
                sizeof(server_address)) < 0){
@@ -91,7 +92,7 @@ int main(void){
         return 1;
     }
 
-    /* Setup phase: request nonsecure communication. */
+    /* Setup phase: request nonsecured communication. */
     char start_packet[] = "(SS,RFMP,v1.0,0)";
 
     if(send_packet(client_socket, start_packet) < 0){
@@ -109,7 +110,8 @@ int main(void){
         close(client_socket);
         return 1;
     }
-    else if(received == 0){
+
+    if(received == 0){
         printf("Server closed the connection during setup.\n");
         close(client_socket);
         return 1;
@@ -142,7 +144,7 @@ int main(void){
 
     printf("Sent: %s\n", command_packet);
 
-    /* Receive and display the server response. */
+    /* Receive the server response. */
     received = recv(client_socket, response,
                     sizeof(response) - 1, 0);
 
@@ -151,25 +153,36 @@ int main(void){
         close(client_socket);
         return 1;
     }
-    else if(received == 0){
+
+    if(received == 0){
         printf("Server closed the connection without a file response.\n");
         close(client_socket);
         return 1;
     }
 
     response[received] = '\0';
-
     int server_error = 0;
 
+    /* Display a server exception. */
     if(strncmp(response, "(EE,", 4) == 0){
         printf("Server reported an error: %s\n", response);
         server_error = 1;
     }
-    else{
-        printf("Server response: %s\n", response);
+
+    /* Display file contents from a successful response. */
+    else if(strncmp(response, "(SC,", 4) == 0 &&
+            received >= 5 &&
+            response[received - 1] == ')'){
+        response[received - 1] = '\0';
+        printf("File contents:\n%s\n", response + 4);
     }
 
-    /* Closing phase: tell the server the client has finished. */
+    else{
+        printf("Unexpected file response: %s\n", response);
+        server_error = 1;
+    }
+
+    /* Closing phase: notify the server that we finished. */
     char end_packet[] = "(End)";
 
     if(send_packet(client_socket, end_packet) < 0){
