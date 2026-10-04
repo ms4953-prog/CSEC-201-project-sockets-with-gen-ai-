@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding as sym_padding
 
+# AES encryption
 def encrypt_data(plain_text: str, key: bytes) -> str:
     iv = os.urandom(16)
     padder = sym_padding.PKCS7(128).padder()
@@ -14,6 +15,7 @@ def encrypt_data(plain_text: str, key: bytes) -> str:
     ciphertext = encryptor.update(padded_data) + encryptor.finalize()
     return (iv + ciphertext).hex()
 
+# AES decryption
 def decrypt_data(hex_data: str, key: bytes) -> str:
     raw_data = bytes.fromhex(hex_data)
     iv = raw_data[:16]
@@ -25,13 +27,14 @@ def decrypt_data(hex_data: str, key: bytes) -> str:
     data = unpadder.update(padded_data) + unpadder.finalize()
     return data.decode()
 
+# Caesar encryption
 def caesar_encrypt(text,key):
     encrypted_text = ""
     for letter in text:
         encrypted_text = encrypted_text + chr(ord(letter) + key)
     return encrypted_text
 
-
+# Caesar decryption
 def caesar_decrypt(text,key):
     decrypted_text = ""
     for letter in text:
@@ -44,83 +47,99 @@ Port = 5000
 Client_S = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 Client_S.connect((Host,Port))
 
-msg = "(SS,RFMP,v1.0,1)"
+print("0 - Non-secured")
+print("1 - Secured")
+secure_mode = input("Enter choice: ")
 
+if secure_mode != "0" and secure_mode != "1":
+    print("Invalid choice.")
+    Client_S.close()
+    exit()
+
+# Start packet
+msg = "(SS,RFMP,v1.0," + secure_mode + ")"
 Client_S.send(msg.encode())
 
-responese = Client_S.recv(4096).decode()
+response = Client_S.recv(4096).decode()
+print("Received from server: ", response)
 
-print("Received from server: ", responese)
+algorithm = "None"
+session_key = None
 
-server_public_key_text = responese[4:-1]
+# Security setup
+if secure_mode == "1":
+    server_public_key_text = response[4:-1]
 
-server_public_key = serialization.load_pem_public_key(
-	server_public_key_text.encode()
-)
+    server_public_key = serialization.load_pem_public_key(
+        server_public_key_text.encode()
+    )
+    # Generate client RSA keys
+    client_private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+    client_public_key = client_private_key.public_key()
+    print("Client RSA key pair generated.")
+    print("1 - AES")
+    print("2 - Caesar")
+    choice = input("Choose encryption: ")
 
-# Generate client RSA key pair
-client_private_key = rsa.generate_private_key(
-	public_exponent=65537,
-	key_size=2048
-)
+    if choice == "1":
+        algorithm = "AES"
+        session_key = os.urandom(32)
+        print("AES session key generated.")
 
-client_public_key = client_private_key.public_key()
+    elif choice == "2":
+        algorithm = "Caesar"
+        session_key = b"10"
+        print("Caesar key generated.")
 
-#Generate AES session key
-session_key = os.urandom(32)
+    else:
+        print("Invalid choice.")
+        Client_S.close()
+        exit()
 
-print("Client RSA key pair generated.")
-print("AES session key generated.")
+    # RSA encrypt session key
+    encrypted_session_key = server_public_key.encrypt(
+        session_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
 
-encrypted_session_key = server_public_key.encrypt(
-	session_key,
-	padding.OAEP(
-		mgf=padding.MGF1(algorithm=hashes.SHA256()),
-		algorithm=hashes.SHA256(),
-		label=None
-	)
-)
+    print("Session key encrypted.")
 
-print("AES session key encrypted.")
+    client_public_key_bytes = client_public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
 
-client_public_key_bytes = client_public_key.public_bytes(
-	encoding=serialization.Encoding.PEM,
-	format=serialization.PublicFormat.SubjectPublicKeyInfo
-)
+    encrypted_session_key_text = encrypted_session_key.hex()
+    username = "mubeen"
 
-encrypted_session_key_text = encrypted_session_key.hex()
+    ec_packet = (
+        b"(EC,"
+        + algorithm.encode()
+        + b","
+        + encrypted_session_key_text.encode()
+        + b","
+        + username.encode()
+        + b":"
+        + client_public_key_bytes
+        + b")"
+    )
 
-username = "mubeen"
-caesar_key = 10
+    print("EC packet created.")
+    Client_S.send(ec_packet)
 
-ec_packet = (
-    b"(EC,AES,"
-    + encrypted_session_key_text.encode()
-    + b","
-    + username.encode()
-    + b":"
-    + client_public_key_bytes
-    + b")"
-)
-
-print("Ec packet created.")
-Client_S.send(ec_packet)
 while True:
-
     command = input("Enter the command: ")
 
     if command == "exit":
         Client_S.send("(CL)".encode())
         break
-    
-    if command == "caesar":
-        text = input("Enter the text: ")
-        encrypted_text = caesar_encrypt(text,caesar_key)
-        packet = "(CA," + encrypted_text + ")"
-        Client_S.send(packet.encode())
-        response = Client_S.recv(4096).decode()
-        print("Received from server:",response)
-        continue
 
     if command == "mkdir":
         directory_name = input("What do you want to name the directory: ")
@@ -129,7 +148,7 @@ while True:
     elif command == "cd":
         directory_name = input("What directory do you want to enter: ")
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
-    
+
     elif command == "rmdir":
         directory_name = input("What directory do you want to remove: ")
         command_data_packet = "(CM,prompt," + command + " " + directory_name + ")"
@@ -146,29 +165,45 @@ while True:
     elif command == "openRead":
         file_name = input("What file do you want to read: ")
         command_data_packet = "(CM,openRead," + file_name + ")"
-        Client_S.send(command_data_packet.encode())
-        responese = Client_S.recv(4096).decode()
 
-        if responese.startswith("(EE,"):
-            print("Received Exception from server:",responese)
+        Client_S.send(command_data_packet.encode())
+        response = Client_S.recv(4096).decode()
+
+        if response.startswith("(EE,"):
+            print("Received Exception from server:", response)
+
+        elif secure_mode == "1" and algorithm == "AES":
+            file_data = decrypt_data(response,session_key)
+            print("File contents (Decrypted):", file_data)
+
+        elif secure_mode == "1" and algorithm == "Caesar":
+            caesar_key = int(session_key.decode())
+            file_data = caesar_decrypt(response,caesar_key)
+            print("File contents (Decrypted):", file_data)
+
         else:
-            try:
-                decrypted_file_data = decrypt_data(responese,session_key)
-                print("File contents (Decrypted):", decrypted_file_data)
-            except Exception:
-                print("Received from server:",responese)
+            print("File contents:", response)
         continue
 
     elif command == "openWrite":
         file_name = input("What file do you want to write: ")
         command_data_packet = "(CM,openWrite," + file_name + ")"
+
         Client_S.send(command_data_packet.encode())
         response = Client_S.recv(4096).decode()
         print("Received from server:", response)
 
+        if response.startswith("(EE,"):
+            continue
+
         text = input("What do you want to write: ")
-        encrypted_text = encrypt_data(text, session_key)
-        packet = "(DP," + encrypted_text + ")"
+        if secure_mode == "1" and algorithm == "AES":
+            text = encrypt_data(text,session_key)
+
+        elif secure_mode == "1" and algorithm == "Caesar":
+            caesar_key = int(session_key.decode())
+            text = caesar_encrypt(text,caesar_key)
+        packet = "(DP," + text + ")"
         Client_S.send(packet.encode())
         response = Client_S.recv(4096).decode()
         print("Received from server:", response)
@@ -185,16 +220,16 @@ while True:
     elif command == "echo":
         text = input("Enter text to display: ")
         command_data_packet = "(CM,prompt," + command + " " + text + ")"
-    
+
     else:
         command_data_packet = "(CM,prompt," + command + ")"
 
     Client_S.send(command_data_packet.encode())
-
     response = Client_S.recv(4096).decode()
+    if response.startswith("(EE,"):
+        print("Received Exception from server:", response)
+    else:
+        print("Received from server:", response)
 
-    print("Received from server:", response)
-	
 Client_S.close()
-
 print("Client closed.")
