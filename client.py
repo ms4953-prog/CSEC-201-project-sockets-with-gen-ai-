@@ -96,6 +96,7 @@ while True:
     command = input("Enter the command: ")
 
     if command == "exit":
+        Client_S.send("(CL)".encode())
         break
 
     if command == "mkdir":
