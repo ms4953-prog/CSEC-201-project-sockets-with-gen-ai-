@@ -134,6 +134,8 @@ if secure_mode == "1":
     print("EC packet created.")
     Client_S.send(ec_packet)
 
+print("Commands: mkdir, cd, rmdir, del, ren, openRead, openWrite, ls, pwd, touch, cat, echo, exit")
+
 while True:
     command = input("Enter the command: ")
 
