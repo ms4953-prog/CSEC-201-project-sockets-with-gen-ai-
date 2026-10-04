@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-/* Send the entire packet, even if send() sends only part of it. */
+/* Send all bytes, even if send() sends only part of the packet. */
 int send_packet(int client_socket, char packet[]){
     size_t length = strlen(packet);
     size_t total = 0;
@@ -15,6 +15,7 @@ int send_packet(int client_socket, char packet[]){
                             length - total, MSG_NOSIGNAL);
 
         if(sent < 0){
+            /* Retry if a signal interrupted send(). */
             if(errno == EINTR){
                 continue;
             }
@@ -33,7 +34,7 @@ int send_packet(int client_socket, char packet[]){
     return 0;
 }
 
-/* Validate the file name before creating a network connection. */
+/* Read and validate the filename before connecting. */
 int read_filename(char filename[], size_t capacity){
     printf("Enter the file name to read: ");
 
@@ -47,6 +48,7 @@ int read_filename(char filename[], size_t capacity){
         return -1;
     }
 
+    /* Remove the newline from the input. */
     filename[strcspn(filename, "\n")] = '\0';
 
     if(filename[0] == '\0'){
@@ -54,6 +56,7 @@ int read_filename(char filename[], size_t capacity){
         return -1;
     }
 
+    /* Reject characters that conflict with the packet format. */
     for(int i = 0; filename[i] != '\0'; i++){
         if(filename[i] == ',' ||
            filename[i] == '(' ||
@@ -67,7 +70,7 @@ int read_filename(char filename[], size_t capacity){
     return 0;
 }
 
-/* Create the TCP socket and connect it to the Python server. */
+/* Create an IPv4 TCP socket and connect to the server. */
 int connect_to_server(const char server_ip[], unsigned short port){
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -106,7 +109,7 @@ int connect_to_server(const char server_ip[], unsigned short port){
     return client_socket;
 }
 
-/* Receive one TCP chunk and retry interrupted recv() calls. */
+/* Receive one TCP chunk and retry interrupted reads. */
 ssize_t receive_response(int client_socket,
                          char response[],
                          size_t capacity){
@@ -131,12 +134,12 @@ ssize_t receive_response(int client_socket,
         return 0;
     }
 
+    /* Terminate the received text as a C string. */
     response[received] = '\0';
     return received;
 }
 
-/* Display file contents or the exception's code and description.
- * Return 0 for success and 1 for an error or invalid response. */
+/* Display SC file contents or EE error details. */
 int display_file_response(char response[], size_t length){
     if(length < 5 ||
        response[0] != '(' ||
@@ -145,7 +148,6 @@ int display_file_response(char response[], size_t length){
         return 1;
     }
 
-    /* An exception has the format (EE,Error Code,Description). */
     if(strncmp(response, "(EE,", 4) == 0){
         char *separator = strchr(response + 4, ',');
 
@@ -166,17 +168,15 @@ int display_file_response(char response[], size_t length){
 
         printf("Server reported an error: %s\n", response);
 
-        /* Separate the fields after displaying the full packet. */
+        /* Separate the error code and description for display. */
         response[length - 1] = '\0';
         *separator = '\0';
 
         printf("Error code: %s\n", response + 4);
         printf("Description: %s\n", separator + 1);
-
         return 1;
     }
 
-    /* A successful read has the format (SC,file contents). */
     if(strncmp(response, "(SC,", 4) == 0){
         response[length - 1] = '\0';
         printf("File contents:\n%s\n", response + 4);
@@ -187,29 +187,13 @@ int display_file_response(char response[], size_t length){
     return 1;
 }
 
-int main(void){
-    char filename[256];
-    char response[4096];
-    char command_packet[300];
-
-    /* Check the input before connecting to the server. */
-    if(read_filename(filename, sizeof(filename)) < 0){
-        return 1;
-    }
-
-    /* Use the same address and port as the Python programs. */
-    int client_socket = connect_to_server("127.0.0.1", 5000);
-
-    if(client_socket < 0){
-        return 1;
-    }
-
-    /* Setup phase: request nonsecured communication. */
+/* Setup phase: request nonsecured RFMP and require (CC). */
+int setup_connection(int client_socket){
     char start_packet[] = "(SS,RFMP,v1.0,0)";
+    char response[4096];
 
     if(send_packet(client_socket, start_packet) < 0){
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
     printf("Sent: %s\n", start_packet);
@@ -218,57 +202,96 @@ int main(void){
                                          sizeof(response));
 
     if(received <= 0){
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
     printf("Received: %s\n", response);
 
-    if(strcmp(response, "(CC)") != 0){
-        printf("Unexpected setup response.\n");
-        close(client_socket);
-        return 1;
+    if(strncmp(response, "(EE,", 4) == 0){
+        display_file_response(response, (size_t)received);
+        return -1;
     }
 
-    /* Operation phase: create the openRead request. */
+    if(received != 4 || strcmp(response, "(CC)") != 0){
+        printf("Unexpected setup response.\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+/* Operation phase: request a file using only openRead. */
+int request_file(int client_socket, const char filename[]){
+    char command_packet[300];
+    char response[4096];
+
     int length = snprintf(command_packet,
                           sizeof(command_packet),
                           "(CM,openRead,%s)", filename);
 
+    /* Check for formatting failure or a truncated request. */
     if(length < 0 || length >= (int)sizeof(command_packet)){
         printf("Could not create the file request.\n");
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
     if(send_packet(client_socket, command_packet) < 0){
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
     printf("Sent: %s\n", command_packet);
 
-    received = receive_response(client_socket, response,
-                                sizeof(response));
+    ssize_t received = receive_response(client_socket, response,
+                                         sizeof(response));
 
     if(received <= 0){
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
-    /* Check the reply and display its contents or error details. */
-    int server_error = display_file_response(response, (size_t)received);
+    return display_file_response(response, (size_t)received);
+}
 
-    /* Closing phase: notify the server that we finished. */
+/* Closing phase: notify the server that the session is finished. */
+int end_session(int client_socket){
     char end_packet[] = "(End)";
 
     if(send_packet(client_socket, end_packet) < 0){
-        close(client_socket);
-        return 1;
+        return -1;
     }
 
     printf("Sent: %s\n", end_packet);
+    return 0;
+}
 
+int main(void){
+    char filename[256];
+
+    if(read_filename(filename, sizeof(filename)) < 0){
+        return 1;
+    }
+
+    int client_socket = connect_to_server("127.0.0.1", 5000);
+
+    if(client_socket < 0){
+        return 1;
+    }
+
+    int exit_code = 1;
+
+    if(setup_connection(client_socket) == 0){
+        int result = request_file(client_socket, filename);
+
+        /* Send End after a received reply, including server errors. */
+        if(result >= 0){
+            exit_code = result;
+
+            if(end_session(client_socket) < 0){
+                exit_code = 1;
+            }
+        }
+    }
+
+    /* Always close the connected socket before exiting. */
     close(client_socket);
-    return server_error;
+    return exit_code;
 }
