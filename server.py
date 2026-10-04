@@ -52,37 +52,32 @@ print("Server is wating for connection")
 def handling_multiclient(Client_S, Client_address):
 
     print("A client connected: ", Client_address)
-
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048
     )
-
     public_key = private_key.public_key()
-
     public_key_bytes = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-
     msg = Client_S.recv(1024).decode()
-
     print("Received from client: ", msg)
 
     if msg == "(SS,RFMP,v1.0,0)":
         Client_S.send("(CC)".encode())
         secure_mode = 0
-    
+        session_key = None
+
     elif msg == "(SS,RFMP,v1.0,1)":
         response = b"(CC," + public_key_bytes + b")"
         Client_S.send(response)
         secure_mode = 1
         ec_packet = Client_S.recv(4096)
         print("Received EC packet from client: ", ec_packet)
-       
         encrypted_session_key = bytes.fromhex(
-        ec_packet.split(b",", 2)[2].split(b",mubeen:", 1)[0].decode()
-    )
+            ec_packet.split(b",", 2)[2].split(b",mubeen:", 1)[0].decode()
+        )
         print("Encrypted AES session key extracted.")
         session_key = private_key.decrypt(
             encrypted_session_key,
@@ -90,22 +85,28 @@ def handling_multiclient(Client_S, Client_address):
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
+            )
         )
-    )
         print("AES session key decrypted successfully.")
 
+    else:
+        Client_S.close()
+        return
+
+    current_directory = os.getcwd()
     file_name = ""
 
     while True:
         try:
             command_data_packet = Client_S.recv(4096).decode()
-
+            if command_data_packet == "":
+                print("Client disconnected.")
+                break
             print("Received command packet:", command_data_packet)
 
             if command_data_packet == "(CL)":
                 print("Client is closing the connection.")
                 break
-
             if command_data_packet.startswith("(CA,"):
                 encrypted_text = command_data_packet[4:-1]
                 text = caesar_decrypt(encrypted_text,10)
@@ -116,111 +117,206 @@ def handling_multiclient(Client_S, Client_address):
 
             if command_data_packet.startswith("(CM,prompt,mkdir "):
                 directory_name = command_data_packet[17:-1]
+                directory_path = os.path.join(
+                    current_directory,
+                    directory_name
+                )
                 print("Creating the directory:", directory_name)
-                os.mkdir(directory_name)
-                print("Created at:", os.path.abspath(directory_name))
+                os.mkdir(directory_path)
+                print("Directory created.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,cd "):
                 directory_name = command_data_packet[14:-1]
-                print("Changing directory to:", directory_name)
-                os.chdir(directory_name)
-                print("Current directory:", os.getcwd())
+                new_directory = os.path.join(
+                    current_directory,
+                    directory_name
+                )
+                new_directory = os.path.abspath(new_directory)
+                if not os.path.isdir(new_directory):
+                    raise FileNotFoundError
+                current_directory = new_directory
+                print("Current directory:", current_directory)
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,rmdir "):
                 directory_name = command_data_packet[17:-1]
+                directory_path = os.path.join(
+                    current_directory,
+                    directory_name
+                )
                 print("Removing the directory:", directory_name)
-                os.rmdir(directory_name)
+                os.rmdir(directory_path)
                 print("Directory removed.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,del "):
                 file_name = command_data_packet[15:-1]
+                file_path = os.path.join(
+                    current_directory,
+                    file_name
+                )
                 print("Deleting the file:", file_name)
-                os.remove(file_name)
+                os.remove(file_path)
                 print("File deleted.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,ren "):
                 names = command_data_packet[15:-1].split(" ")
                 old_name = names[0]
                 new_name = names[1]
+                old_path = os.path.join(
+                    current_directory,
+                    old_name
+                )
+                new_path = os.path.join(
+                    current_directory,
+                    new_name
+                )
                 print("Renaming", old_name, "to", new_name)
-                os.rename(old_name, new_name)
+                os.rename(old_path,new_path)
                 print("File or directory renamed.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,openRead,"):
                 file_name = command_data_packet[13:-1]
+                file_path = os.path.join(
+                    current_directory,
+                    file_name
+                )
                 print("Reading the file:", file_name)
-                file = open(file_name, "r")
+                file = open(file_path,"r")
                 file_data = file.read()
                 file.close()
                 print("File contents:", file_data)
+
                 if secure_mode == 1:
-                    encrypted_file_data = encrypt_data(file_data, session_key)
-                    Client_S.send(encrypted_file_data.encode())
+                    encrypted_file_data = encrypt_data(
+                        file_data,
+                        session_key
+                    )
+                    Client_S.send(
+                        encrypted_file_data.encode()
+                    )
                 else:
-                    Client_S.send(file_data.encode())
+                    Client_S.send(
+                        file_data.encode()
+                    )
                 continue
 
             elif command_data_packet.startswith("(CM,openWrite,"):
                 file_name = command_data_packet[14:-1]
+                file_name = os.path.join(
+                    current_directory,
+                    file_name
+                )
                 print("Opening the file for writing:", file_name)
-                file = open(file_name, "w")
+                file = open(file_name,"w")
                 file.close()
                 print("File created.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
+
             elif command_data_packet.startswith("(DP,"):
                 text = command_data_packet[4:-1]
                 if secure_mode == 1:
-                    text = decrypt_data(text, session_key)
+                    text = decrypt_data(text,session_key)
                 print("Received data:", text)
-                file = open(file_name, "w")
+                file = open(file_name,"w")
                 file.write(text)
                 file.close()
                 print("Data written to file.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,ls)"):
-                print("Listing directory contents:")
-                contents = os.listdir(".")
-                print("Contents:", contents)
+                contents = os.listdir(current_directory)
+                print("Contents:",contents)
+                response = "(SC," + str(contents) + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,pwd)"):
-                print("Current working directory:")
-                cwd = os.getcwd()
-                print("Path:", cwd)
+                print("Current directory:",current_directory)
+                response = "(SC," + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,touch "):
                 file_name = command_data_packet[17:-1]
-                print("Creating empty file:", file_name)
-                open(file_name, "a").close()
+                file_path = os.path.join(
+                    current_directory,
+                    file_name
+                )
+                print("Creating empty file:",file_name)
+                open(file_path,"a").close()
                 print("File created.")
+                response = "(SC,Current directory: " + current_directory + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,cat "):
                 file_name = command_data_packet[15:-1]
-                print("Displaying file contents for:", file_name)
-                if os.path.exists(file_name):
-                    file = open(file_name, "r")
-                    file_data = file.read()
-                    file.close()
-                    print("File contents:", file_data)
-                else:
-                    print("File does not exist.")
+
+                file_path = os.path.join(
+                    current_directory,
+                    file_name
+                )
+                print("Displaying file contents for:",file_name)
+                file = open(file_path,"r")
+                file_data = file.read()
+                file.close()
+                print("File contents:",file_data)
+                response = "(SC," + file_data + ")"
+                Client_S.send(response.encode())
+                continue
 
             elif command_data_packet.startswith("(CM,prompt,echo "):
                 text = command_data_packet[16:-1]
                 print("Echo output:",text)
+                response = "(SC," + text + ")"
+                Client_S.send(response.encode())
+                continue
 
-            Client_S.send("(SC)".encode())
+            else:
+                error_packet = "(EE,400,Invalid command)"
+                print("Sending Error Packet:",error_packet)
+                Client_S.send(error_packet.encode())
 
-        except FileNotFoundError as e:
+
+        except FileNotFoundError:
             error_packet = "(EE,404,File or directory not found)"
             print("Sending Error Packet:",error_packet)
             Client_S.send(error_packet.encode())
 
+        except FileExistsError:
+            error_packet = "(EE,409,File or directory already exists)"
+            print("Sending Error Packet:",error_packet)
+            Client_S.send(error_packet.encode())
+
+        except PermissionError:
+            error_packet = "(EE,403,Permission denied)"
+            print("Sending Error Packet:",error_packet)
+            Client_S.send(error_packet.encode())
+
         except Exception as e:
-            error_packet = f"(EE,500,{str(e)})"
+            error_packet = "(EE,500," + str(e) + ")"
             print("Sending Error Packet:",error_packet)
             Client_S.send(error_packet.encode())
 
     Client_S.close()
-
     print("Client connection closed:", Client_address)
 
 
@@ -234,5 +330,4 @@ while True:
     )
 
     client_thread.start()
-
     print("New client thread started.")
