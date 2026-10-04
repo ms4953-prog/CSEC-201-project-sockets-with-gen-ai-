@@ -135,6 +135,58 @@ ssize_t receive_response(int client_socket,
     return received;
 }
 
+/* Display file contents or the exception's code and description.
+ * Return 0 for success and 1 for an error or invalid response. */
+int display_file_response(char response[], size_t length){
+    if(length < 5 ||
+       response[0] != '(' ||
+       response[length - 1] != ')'){
+        printf("Unexpected file response: %s\n", response);
+        return 1;
+    }
+
+    /* An exception has the format (EE,Error Code,Description). */
+    if(strncmp(response, "(EE,", 4) == 0){
+        char *separator = strchr(response + 4, ',');
+
+        if(separator == NULL ||
+           separator == response + 4 ||
+           separator + 1 >= response + length - 1){
+            printf("Invalid exception packet: %s\n", response);
+            return 1;
+        }
+
+        /* Check that the error code contains only digits. */
+        for(char *digit = response + 4; digit < separator; digit++){
+            if(*digit < '0' || *digit > '9'){
+                printf("Invalid exception error code: %s\n", response);
+                return 1;
+            }
+        }
+
+        printf("Server reported an error: %s\n", response);
+
+        /* Separate the fields after displaying the full packet. */
+        response[length - 1] = '\0';
+        *separator = '\0';
+
+        printf("Error code: %s\n", response + 4);
+        printf("Description: %s\n", separator + 1);
+
+        return 1;
+    }
+
+    /* A successful read has the format (SC,file contents). */
+    if(strncmp(response, "(SC,", 4) == 0){
+        response[length - 1] = '\0';
+        printf("File contents:\n%s\n", response + 4);
+        return 0;
+    }
+
+    printf("Unexpected file response: %s\n", response);
+    return 1;
+}
+
 int main(void){
     char filename[256];
     char response[4096];
@@ -196,7 +248,6 @@ int main(void){
 
     printf("Sent: %s\n", command_packet);
 
-    /* Receive the file response using the same helper. */
     received = receive_response(client_socket, response,
                                 sizeof(response));
 
@@ -205,26 +256,8 @@ int main(void){
         return 1;
     }
 
-    int server_error = 0;
-
-    /* Display a server exception. */
-    if(strncmp(response, "(EE,", 4) == 0){
-        printf("Server reported an error: %s\n", response);
-        server_error = 1;
-    }
-
-    /* Display file contents from a successful response. */
-    else if(strncmp(response, "(SC,", 4) == 0 &&
-            received >= 5 &&
-            response[received - 1] == ')'){
-        response[received - 1] = '\0';
-        printf("File contents:\n%s\n", response + 4);
-    }
-
-    else{
-        printf("Unexpected file response: %s\n", response);
-        server_error = 1;
-    }
+    /* Check the reply and display its contents or error details. */
+    int server_error = display_file_response(response, (size_t)received);
 
     /* Closing phase: notify the server that we finished. */
     char end_packet[] = "(End)";
