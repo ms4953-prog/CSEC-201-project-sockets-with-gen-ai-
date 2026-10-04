@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-/* Send the whole packet, even when send() sends only part. */
+/* Send the entire packet, even if send() sends only part of it. */
 int send_packet(int client_socket, char packet[]){
     size_t length = strlen(packet);
     size_t total = 0;
@@ -22,8 +22,7 @@ int send_packet(int client_socket, char packet[]){
             perror("Send error");
             return -1;
         }
-
-        if(sent == 0){
+        else if(sent == 0){
             printf("Could not finish sending the packet.\n");
             return -1;
         }
@@ -34,29 +33,25 @@ int send_packet(int client_socket, char packet[]){
     return 0;
 }
 
-int main(void){
-    char filename[256];
-    char response[4096];
-    char command_packet[300];
-
-    /* Read and validate the file name. */
+/* Validate the file name before creating a network connection. */
+int read_filename(char filename[], size_t capacity){
     printf("Enter the file name to read: ");
 
-    if(fgets(filename, sizeof(filename), stdin) == NULL){
+    if(fgets(filename, capacity, stdin) == NULL){
         printf("Could not read the file name.\n");
-        return 1;
+        return -1;
     }
 
     if(strchr(filename, '\n') == NULL && !feof(stdin)){
         printf("File name is too long.\n");
-        return 1;
+        return -1;
     }
 
     filename[strcspn(filename, "\n")] = '\0';
 
     if(filename[0] == '\0'){
         printf("File name cannot be empty.\n");
-        return 1;
+        return -1;
     }
 
     for(int i = 0; filename[i] != '\0'; i++){
@@ -65,8 +60,21 @@ int main(void){
            filename[i] == ')' ||
            filename[i] == '\r'){
             printf("File name contains a character that conflicts with the packet format.\n");
-            return 1;
+            return -1;
         }
+    }
+
+    return 0;
+}
+
+int main(void){
+    char filename[256];
+    char response[4096];
+    char command_packet[300];
+
+    /* Check the input before connecting to the server. */
+    if(read_filename(filename, sizeof(filename)) < 0){
+        return 1;
     }
 
     /* Create the client socket. */
@@ -83,7 +91,7 @@ int main(void){
     server_address.sin_port = htons(5000);
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    /* Connect to the Python server. */
+    /* Connect to the server. */
     if(connect(client_socket,
                (struct sockaddr *)&server_address,
                sizeof(server_address)) < 0){
@@ -110,8 +118,7 @@ int main(void){
         close(client_socket);
         return 1;
     }
-
-    if(received == 0){
+    else if(received == 0){
         printf("Server closed the connection during setup.\n");
         close(client_socket);
         return 1;
@@ -144,7 +151,7 @@ int main(void){
 
     printf("Sent: %s\n", command_packet);
 
-    /* Receive the server response. */
+    /* Receive the file response. */
     received = recv(client_socket, response,
                     sizeof(response) - 1, 0);
 
@@ -153,8 +160,7 @@ int main(void){
         close(client_socket);
         return 1;
     }
-
-    if(received == 0){
+    else if(received == 0){
         printf("Server closed the connection without a file response.\n");
         close(client_socket);
         return 1;
