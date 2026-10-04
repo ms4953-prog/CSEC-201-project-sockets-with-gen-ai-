@@ -1,5 +1,6 @@
 import socket
 import os
+import threading
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -24,6 +25,19 @@ def decrypt_data(hex_data: str, key: bytes) -> str:
     unpadder = sym_padding.PKCS7(128).unpadder()
     data = unpadder.update(padded_data) + unpadder.finalize()
     return data.decode()
+
+def caesar_encrypt(text,key):
+    encrypted_text = ""
+    for letter in text:
+        encrypted_text = encrypted_text + chr(ord(letter) + key)
+    return encrypted_text
+
+
+def caesar_decrypt(text,key):
+    decrypted_text = ""
+    for letter in text:
+        decrypted_text = decrypted_text + chr(ord(letter) - key)
+    return decrypted_text
 
 Host = "127.0.0.1"
 Port = 5000
@@ -78,6 +92,7 @@ client_public_key_bytes = client_public_key.public_bytes(
 encrypted_session_key_text = encrypted_session_key.hex()
 
 username = "mubeen"
+caesar_key = 10
 
 ec_packet = (
     b"(EC,AES,"
@@ -98,6 +113,15 @@ while True:
     if command == "exit":
         Client_S.send("(CL)".encode())
         break
+    
+    if command == "caesar":
+        text = input("Enter the text: ")
+        encrypted_text = caesar_encrypt(text,caesar_key)
+        packet = "(CA," + encrypted_text + ")"
+        Client_S.send(packet.encode())
+        response = Client_S.recv(4096).decode()
+        print("Received from server:",response)
+        continue
 
     if command == "mkdir":
         directory_name = input("What do you want to name the directory: ")
